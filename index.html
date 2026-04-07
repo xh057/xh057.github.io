@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>xh057</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background-color: #0d0d0d;
+            color: #d8d8d8;
+            font-family: 'Courier New', Courier, monospace;
+            padding: 30px;
+            min-height: 100vh;
+        }
+
+        /* Scanline overlay */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.12) 0px,
+                rgba(0, 0, 0, 0.12) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            z-index: 100;
+        }
+
+        /* Boot sequence */
+        #boot {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            color: #aaa;
+            font-family: inherit;
+            font-size: 0.85em;
+            padding: 20px;
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            transition: opacity 0.5s;
+        }
+
+        #boot.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        #boot .line {
+            margin: 2px 0;
+        }
+
+        #boot .line.ok {
+            color: #5a5;
+        }
+
+        #boot .line.warn {
+            color: #aa5;
+        }
+
+        /* Main layout */
+        .terminal {
+            opacity: 0;
+            transition: opacity 0.8s;
+        }
+
+        .terminal.visible {
+            opacity: 1;
+        }
+
+        .header {
+            border-bottom: 1px solid #333;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        .header pre {
+            font-size: 8px;
+            line-height: 1.1;
+            color: #555;
+            margin-bottom: 10px;
+        }
+
+        .header h1 {
+            font-size: 1.2em;
+            color: #fff;
+            font-weight: normal;
+        }
+
+        .header .subtitle {
+            color: #777;
+            font-size: 0.85em;
+            margin-top: 5px;
+        }
+
+        /* Grid layout */
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 600px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .panel {
+            border: 1px solid #2a2a2a;
+            padding: 15px;
+            position: relative;
+        }
+
+        .panel::before {
+            content: attr(data-label);
+            position: absolute;
+            top: -9px;
+            left: 10px;
+            background: #0d0d0d;
+            padding: 2px 5px;
+            font-size: 0.75em;
+            color: #666;
+        }
+
+        .panel.full {
+            grid-column: 1 / -1;
+        }
+
+        .panel h3 {
+            color: #bbb;
+            font-size: 0.9em;
+            font-weight: normal;
+            margin-bottom: 10px;
+        }
+
+        .panel p, .panel li {
+            font-size: 0.85em;
+            color: #ccc;
+            line-height: 1.6;
+        }
+
+        .panel ul {
+            list-style: none;
+            padding-left: 10px;
+        }
+
+        .panel ul li::before {
+            content: "$ ";
+            color: #666;
+        }
+
+        /* Progress bars */
+        .stat {
+            margin: 8px 0;
+        }
+
+        .stat-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8em;
+            color: #888;
+            margin-bottom: 3px;
+        }
+
+        .stat-bar {
+            height: 4px;
+            background: #1a1a1a;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .stat-fill {
+            height: 100%;
+            background: #666;
+            width: 0;
+            transition: width 1.5s ease;
+        }
+
+        /* Activity log */
+        .log {
+            font-size: 0.8em;
+            color: #999;
+        }
+
+        .log-entry {
+            padding: 4px 0;
+            border-bottom: 1px dotted #222;
+        }
+
+        .log-entry:last-child {
+            border-bottom: none;
+        }
+
+        .log-date {
+            color: #555;
+            margin-right: 8px;
+        }
+
+        /* Blog styles */
+        .blog-list {
+            list-style: none;
+            padding: 0;
+        }
+
+        .blog-item {
+            padding: 15px 0;
+            border-bottom: 1px solid #1a1a1a;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .blog-item:hover {
+            background: #111;
+        }
+
+        .blog-item:last-child {
+            border-bottom: none;
+        }
+
+        .blog-item-title {
+            color: #d8d8d8;
+            font-size: 1em;
+            margin-bottom: 5px;
+        }
+
+        .blog-item-title::before {
+            content: ">> ";
+            color: #555;
+        }
+
+        .blog-item-date {
+            color: #555;
+            font-size: 0.75em;
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .blog-item-excerpt {
+            color: #999;
+            font-size: 0.8em;
+            line-height: 1.5;
+        }
+
+        /* Blog post view */
+        .blog-post {
+            display: none;
+        }
+
+        .blog-post.active {
+            display: block;
+        }
+
+        .blog-post-header {
+            margin-bottom: 20px;
+        }
+
+        .blog-post-title {
+            color: #fff;
+            font-size: 1.3em;
+            margin-bottom: 8px;
+        }
+
+        .blog-post-meta {
+            color: #555;
+            font-size: 0.8em;
+        }
+
+        .blog-post-content,
+        .blog-item-title,
+        .blog-item-excerpt,
+        .blog-item-date {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .blog-post-content {
+            color: #ccc;
+            font-size: 0.95em;
+            line-height: 1.8;
+        }
+
+        .blog-item-title {
+            font-size: 1.05em;
+        }
+
+        .blog-item-excerpt {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+
+        .blog-item-date {
+            color: #666;
+            font-size: 0.8em;
+        }
+
+        /* Blog search */
+        .blog-search {
+            margin-bottom: 12px;
+            position: relative;
+        }
+
+        .blog-search input {
+            width: 100%;
+            background: #111;
+            border: 1px solid #2a2a2a;
+            padding: 8px 12px 8px 28px;
+            color: #ddd;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-size: 0.9em;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .blog-search input:focus {
+            border-color: #444;
+        }
+
+        .blog-search input::placeholder {
+            color: #444;
+        }
+
+        .blog-search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: #444;
+            font-family: 'Courier New', Courier, monospace;
+            pointer-events: none;
+        }
+
+        .blog-no-results {
+            color: #444;
+            padding: 20px 0;
+            text-align: center;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        /* Blog item as link */
+        .blog-item-link {
+            text-decoration: none;
+            color: inherit;
+            display: block;
+        }
+
+        .blog-item-link:hover {
+            text-decoration: none;
+        }
+
+        /* Less matrix when blog visible */
+        .tab-content#tab-blog.active ~ .footer ~ div #matrix,
+        body.blog-mode #matrix {
+            opacity: 0.02;
+        }
+
+        .blog-post-content p {
+            margin-bottom: 15px;
+        }
+
+        .blog-post-content h4 {
+            color: #aaa;
+            font-size: 1em;
+            margin: 20px 0 10px;
+        }
+
+        .blog-post-content code {
+            background: #1a1a1a;
+            padding: 2px 6px;
+            color: #8f8;
+            font-size: 0.9em;
+        }
+
+        .blog-post-content pre {
+            background: #111;
+            border: 1px solid #2a2a2a;
+            padding: 12px;
+            margin: 15px 0;
+            overflow-x: auto;
+        }
+
+        .blog-post-content pre code {
+            background: none;
+            padding: 0;
+        }
+
+        .blog-post-content blockquote {
+            border-left: 3px solid #333;
+            padding-left: 15px;
+            margin: 15px 0;
+            color: #888;
+            font-style: italic;
+        }
+
+        .back-btn {
+            background: none;
+            border: 1px solid #333;
+            color: #888;
+            padding: 5px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8em;
+            margin-bottom: 15px;
+            transition: all 0.2s;
+        }
+
+        .back-btn:hover {
+            border-color: #666;
+            color: #bbb;
+        }
+
+        /* Footer */
+        .footer {
+            margin-top: 30px;
+            padding-top: 10px;
+            border-top: 1px solid #222;
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75em;
+            color: #555;
+        }
+
+        .footer a {
+            color: #777;
+            text-decoration: none;
+            margin: 0 8px;
+        }
+
+        .footer a:hover {
+            color: #ccc;
+            text-decoration: underline;
+        }
+
+        /* Blinking cursor */
+        .blink {
+            animation: cursor-blink 1s step-end infinite;
+        }
+
+        @keyframes cursor-blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        /* Tab navigation */
+        .tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: -1px;
+            flex-wrap: wrap;
+        }
+
+        .tab-content.active:first-of-type {
+            padding-top: 15px;
+        }
+
+        .tab-btn {
+            background: none;
+            border: 1px solid #2a2a2a;
+            border-bottom: none;
+            color: #555;
+            padding: 6px 15px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 0.8em;
+            position: relative;
+            top: 1px;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            color: #999;
+        }
+
+        .tab-btn.active {
+            color: #ddd;
+            background: #0d0d0d;
+            border-color: #333;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Matrix rain canvas */
+        #matrix {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.05;
+            transition: opacity 0.5s ease;
+        }
+    </style>
+</head>
+<body>
+
+<canvas id="matrix"></canvas>
+
+<!-- Boot Sequence -->
+<div id="boot"></div>
+
+<!-- Main Content -->
+<div class="terminal" id="terminal">
+    <div class="header">
+        <pre>
+________________/\\\_____________/\\\\\\\______/\\\\\\\\\\\\\\\___/\\\\\\\\\\\\\\\_        
+ _______________\/\\\___________/\\\/////\\\___\/\\\///////////___\/////////////\\\_       
+  _______________\/\\\__________/\\\____\//\\\__\/\\\_________________________/\\\/__      
+   __/\\\____/\\\_\/\\\_________\/\\\_____\/\\\__\/\\\\\\\\\\\\______________/\\\/____     
+    _\///\\\/\\\/__\/\\\\\\\\\\__\/\\\_____\/\\\__\////////////\\\__________/\\\/______    
+     ___\///\\\/____\/\\\/////\\\_\/\\\_____\/\\\_____________\//\\\_______/\\\/________   
+      ____/\\\/\\\___\/\\\___\/\\\_\//\\\____/\\\___/\\\________\/\\\_____/\\\/__________  
+       __/\\\/\///\\\_\/\\\___\/\\\__\///\\\\\\\/___\//\\\\\\\\\\\\\/____/\\\/____________ 
+        _\///____\///__\///____\///_____\///////______\/////////////_____\///______________                                                                     
+        </pre>
+        <h1>~ welcome to my corner</h1>
+        <div class="subtitle">last login: <span id="last-login"></span></div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="overview">overview</button>
+        <button class="tab-btn" data-tab="stats">stats</button>
+        <button class="tab-btn" data-tab="blog">blog</button>
+        <button class="tab-btn" data-tab="log">log</button>
+    </div>
+
+    <div style="height: 12px;"></div>
+
+    <!-- Tab: Overview -->
+    <div class="tab-content active" id="tab-overview">
+        <div class="grid">
+            <div class="panel" data-label="whoami">
+                <p>
+                    Hacker. Security researcher. Problem solver. 
+                    Passionate about technology, security.
+                    Love learning new stuff / self-improving.
+                </p>
+            </div>
+            <div class="panel" data-label="current">
+                <p>
+                    Currently doing pentests.
+                </p>
+            </div>
+            <div class="panel full" data-label="interests">
+                <h3>$ interests</h3>
+                <ul>
+                    <li>Modern web architecture</li>
+                    <li>Low level stuff, love to dive into cpu architecture manuals</li>
+                    <li>Open source, FOSS and self-hosting</li>
+                    <li>Networking, and maybe some programming</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Stats -->
+    <div class="tab-content" id="tab-stats">
+        <div class="panel full" data-label="proficiency">
+            <div class="stat">
+                <div class="stat-label"><span>security research / pentest</span><span>85%</span></div>
+                <div class="stat-bar"><div class="stat-fill" data-width="85"></div></div>
+            </div>
+            <div class="stat">
+                <div class="stat-label"><span>linux / sysadmin</span><span>82%</span></div>
+                <div class="stat-bar"><div class="stat-fill" data-width="82"></div></div>
+            </div>
+            <div class="stat">
+                <div class="stat-label"><span>scripting langs / python / bash</span><span>78%</span></div>
+                <div class="stat-bar"><div class="stat-fill" data-width="78"></div></div>
+            </div>
+            <div class="stat">
+                <div class="stat-label"><span>javascript / typescript</span><span>75%</span></div>
+                <div class="stat-bar"><div class="stat-fill" data-width="75"></div></div>
+            </div>
+            <div class="stat">
+                <div class="stat-label"><span>programming langs / cpp / assembly</span><span>50%</span></div>
+                <div class="stat-bar"><div class="stat-fill" data-width="50"></div></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Blog -->
+    <div class="tab-content" id="tab-blog">
+        <div class="panel full" data-label="blog">
+            <!-- Blog List View -->
+            <div id="blog-list-view">
+                <div class="blog-search">
+                    <span class="blog-search-icon">/</span>
+                    <input type="text" id="blog-search-input" placeholder="search posts..." autocomplete="off">
+                </div>
+                <ul class="blog-list" id="blog-list"></ul>
+                <div id="blog-no-results" class="blog-no-results" style="display:none;">no results found</div>
+            </div>
+            <!-- Blog Post View -->
+            <div id="blog-post-view" class="blog-post">
+                <button class="back-btn" onclick="showBlogList()"><< back to posts</button>
+                <div class="blog-post-header">
+                    <div class="blog-post-title" id="post-title"></div>
+                    <div class="blog-post-meta">
+                        <span id="post-date"></span> | <span id="post-tags"></span>
+                    </div>
+                </div>
+                <div class="blog-post-content" id="post-content"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Log -->
+    <div class="tab-content" id="tab-log">
+        <div class="panel full" data-label="recent_activity">
+            <div class="log">
+                <div class="log-entry"><span class="log-date">2026-04</span> tbd</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        <div>
+            <a href="https://github.com/xh057">[github]</a>
+            <a href="mailto:me@nomailyetsorry">[email]</a>
+            <a href="javascript:alert('are you for real?');">[linkedin]</a>
+        </div>
+        <div>uptime: <span id="uptime"></span></div>
+    </div>
+
+    <div style="margin-top: 10px; color: #555; font-size: 0.8em;">
+        root@server:~# ./hacktheplanet<span class="blink">_</span>
+    </div>
+</div>
+
+<script>
+    const BLOG_DIR = 'blog';
+
+    let blogIndex = [];
+    let blogCache = {};
+
+    async function loadBlogIndex() {
+        try {
+            const res = await fetch(`${BLOG_DIR}/index.json`);
+            blogIndex = await res.json();
+        } catch (err) {
+            console.error('Failed to load blog index:', err);
+            blogIndex = [];
+        }
+    }
+
+    async function loadPost(postId) {
+        if (blogCache[postId]) return blogCache[postId];
+        try {
+            const res = await fetch(`${BLOG_DIR}/${postId}.json`);
+            const post = await res.json();
+            blogCache[postId] = post;
+            return post;
+        } catch (err) {
+            console.error(`Failed to load post ${postId}:`, err);
+            return null;
+        }
+    }
+
+    function toggleMatrixForBlog(visible) {
+        document.getElementById('matrix').style.opacity = visible ? '0.015' : '0.05';
+    }
+
+    function renderBlogList(posts) {
+        const list = document.getElementById('blog-list');
+        const noResults = document.getElementById('blog-no-results');
+        posts = posts || blogIndex;
+
+        if (posts.length === 0) {
+            list.innerHTML = '';
+            noResults.style.display = 'block';
+            return;
+        }
+
+        noResults.style.display = 'none';
+        list.innerHTML = posts.map(post => `
+            <li class="blog-item">
+                <a class="blog-item-link" href="blog/${post.id}" data-post-id="${post.id}">
+                    <div class="blog-item-date">${post.date}</div>
+                    <div class="blog-item-title">${post.title}</div>
+                    <div class="blog-item-excerpt">${post.excerpt}</div>
+                </a>
+            </li>
+        `).join('');
+
+        list.querySelectorAll('.blog-item-link').forEach(link => {
+            link.addEventListener('click', (e) => {
+                e.preventDefault();
+                const postId = link.getAttribute('data-post-id');
+                showPost(postId);
+                window.location.hash = `blog/${postId}`;
+            });
+        });
+    }
+
+    function clearHash() {
+        if (window.location.hash) {
+            history.replaceState(null, '', window.location.href.split('#')[0]);
+        }
+    }
+
+    async function showPost(postId) {
+        const post = await loadPost(postId);
+        if (!post) {
+            document.getElementById('post-title').textContent = 'Post not found';
+            document.getElementById('post-date').textContent = '';
+            document.getElementById('post-tags').textContent = '';
+            document.getElementById('post-content').innerHTML = '<p>The requested post could not be loaded.</p>';
+        } else {
+            document.getElementById('post-title').textContent = post.title;
+            document.getElementById('post-date').textContent = post.date;
+            document.getElementById('post-tags').textContent = post.tags.join(', ');
+            document.getElementById('post-content').innerHTML = post.content;
+        }
+        document.getElementById('blog-list-view').style.display = 'none';
+        document.getElementById('blog-post-view').classList.add('active');
+        toggleMatrixForBlog(true);
+    }
+
+    function showBlogList() {
+        document.getElementById('blog-list-view').style.display = 'block';
+        document.getElementById('blog-post-view').classList.remove('active');
+        toggleMatrixForBlog(false);
+        const searchInput = document.getElementById('blog-search-input');
+        if (searchInput) {
+            searchInput.value = '';
+            renderBlogList();
+        }
+        clearHash();
+    }
+
+    function onBlogTabClick() {
+        showBlogList();
+    }
+
+    function initBlogSearch() {
+        const input = document.getElementById('blog-search-input');
+        if (!input) return;
+
+        input.addEventListener('input', () => {
+            const query = input.value.trim().toLowerCase();
+            if (!query) {
+                renderBlogList();
+                return;
+            }
+            const filtered = blogIndex.filter(post => {
+                return post.title.toLowerCase().includes(query) ||
+                       post.excerpt.toLowerCase().includes(query) ||
+                       (post.tags && post.tags.some(tag => tag.toLowerCase().includes(query)));
+            });
+            renderBlogList(filtered);
+        });
+    }
+
+    function handleHashRoute() {
+        const hash = window.location.hash.slice(1);
+        if (hash.startsWith('blog/')) {
+            const postId = hash.slice(5);
+            if (postId) {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                document.querySelector('[data-tab="blog"]').classList.add('active');
+                document.getElementById('tab-blog').classList.add('active');
+                showPost(postId);
+            }
+        }
+    }
+
+    const bootMessages = [
+        { text: 'BIOS v3.2.5... OK', cls: 'ok' },
+        { text: 'Initializing memory... 65536K OK', cls: 'ok' },
+        { text: 'Loading kernel modules...', cls: '' },
+        { text: '  ├─ network.ko', cls: 'ok' },
+        { text: '  ├─ graphics.ko', cls: 'ok' },
+        { text: '  └─ personality.ko', cls: 'warn' },
+        { text: 'Mounting filesystems...', cls: '' },
+        { text: 'Starting portfolio daemon...', cls: 'ok' },
+        { text: '[ OK ] Portfolio ready.', cls: 'ok' },
+    ];
+
+    const bootEl = document.getElementById('boot');
+    let bootIndex = 0;
+
+    async function bootSequence() {
+        if (bootIndex < bootMessages.length) {
+            const line = document.createElement('div');
+            line.className = 'line ' + bootMessages[bootIndex].cls;
+            line.textContent = bootMessages[bootIndex].text;
+            bootEl.appendChild(line);
+            bootIndex++;
+            setTimeout(bootSequence, 150 + Math.random() * 200);
+        } else {
+            await loadBlogIndex();
+            setTimeout(() => {
+                bootEl.classList.add('hidden');
+                document.getElementById('terminal').classList.add('visible');
+                animateStats();
+                renderBlogList();
+                handleHashRoute();
+            }, 600);
+        }
+    }
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+            if (btn.dataset.tab === 'stats') animateStats();
+            if (btn.dataset.tab === 'blog') onBlogTabClick();
+            else clearHash();
+        });
+    });
+
+    function animateStats() {
+        document.querySelectorAll('.stat-fill').forEach(fill => {
+            setTimeout(() => {
+                fill.style.width = fill.dataset.width + '%';
+            }, 100);
+        });
+    }
+
+    document.getElementById('last-login').textContent = new Date().toLocaleString();
+
+    const startTime = Date.now();
+    function updateUptime() {
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const h = Math.floor(elapsed / 3600).toString().padStart(2, '0');
+        const m = Math.floor((elapsed % 3600) / 60).toString().padStart(2, '0');
+        const s = (elapsed % 60).toString().padStart(2, '0');
+        document.getElementById('uptime').textContent = `${h}:${m}:${s}`;
+    }
+    setInterval(updateUptime, 1000);
+    updateUptime();
+
+    const canvas = document.getElementById('matrix');
+    const ctx = canvas.getContext('2d');
+
+    function resizeCanvas() {
+        canvas.width = window.innerWidth;
+        canvas.height = window.innerHeight;
+    }
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    const cols = Math.floor(canvas.width / 14);
+    const drops = Array(cols).fill(1);
+    const chars = 'アイウエオカキクケコサシスセソタチツテトナニヌネノ0123456789'.split('');
+
+    function drawMatrix() {
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillStyle = '#0f0';
+        ctx.font = '12px monospace';
+
+        for (let i = 0; i < drops.length; i++) {
+            const text = chars[Math.floor(Math.random() * chars.length)];
+            ctx.fillText(text, i * 14, drops[i] * 14);
+            if (drops[i] * 14 > canvas.height && Math.random() > 0.975) {
+                drops[i] = 0;
+            }
+            drops[i]++;
+        }
+    }
+    setInterval(drawMatrix, 50);
+
+    window.addEventListener('hashchange', handleHashRoute);
+
+    window.addEventListener('DOMContentLoaded', () => {
+        bootSequence();
+        initBlogSearch();
+    });
+</script>
+
+</body>
+</html>
